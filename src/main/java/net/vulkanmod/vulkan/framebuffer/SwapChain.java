@@ -92,8 +92,7 @@ public class SwapChain extends Framebuffer {
 
             // minImageCount depends on driver: Mesa/RADV needs a min of 4, but most other drivers are at least 2 or 3
             // TODO using FIFO present mode with image num > 2 introduces (unnecessary) input lag
-            int requestedImages = Math.max(DEFAULT_IMAGE_COUNT, surfaceProperties.capabilities.minImageCount());
-
+            int requestedImages = Math.max(Initializer.CONFIG.imageCount, surfaceProperties.capabilities.minImageCount());
             IntBuffer imageCount = stack.ints(requestedImages);
 
             VkSwapchainCreateInfoKHR createInfo = VkSwapchainCreateInfoKHR.calloc(stack);
@@ -145,6 +144,7 @@ public class SwapChain extends Framebuffer {
 
             LongBuffer pSwapchainImages = stack.mallocLong(imageCount.get(0));
 
+            Initializer.LOGGER.info("Requested Image Count -> " + requestedImages + " Actual Images -> " + imageCount.get(0));
             vkGetSwapchainImagesKHR(device, this.swapChainId, imageCount, pSwapchainImages);
 
             this.swapChainImages = new ArrayList<>(imageCount.get(0));

@@ -149,6 +149,10 @@ public abstract class Queue {
                 }
             }
 
+            if (indices.computeFamily == -1) {
+                indices.computeFamily = indices.graphicsFamily;
+            }
+
             if (indices.transferFamily == VK_QUEUE_FAMILY_IGNORED)
                 throw new RuntimeException("Unable to find queue family with transfer support.");
             if (indices.graphicsFamily == VK_QUEUE_FAMILY_IGNORED)

@@ -1,8 +1,6 @@
 package net.vulkanmod.vulkan;
 
-import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -29,7 +27,8 @@ public class SystemInfo {
 
     public static String getProcessorNameForDesktop() {
         try {
-            CentralProcessor centralProcessor = new oshi.SystemInfo().getHardware().getProcessor();
+            oshi.SystemInfo systemInfo = new oshi.SystemInfo();
+            CentralProcessor centralProcessor = systemInfo.getHardware().getProcessor();
             return String.format("%s", centralProcessor.getProcessorIdentifier().getName()).replaceAll("\\s+", " ");
         } catch (Exception e) {
             return getProcessorNameForAndroid();

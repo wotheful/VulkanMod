@@ -15,11 +15,22 @@ public class SystemInfo {
 
     public static String getProcessorNameForAndroid() {
         try (BufferedReader br = new BufferedReader(new FileReader("/proc/cpuinfo"))) {
-            return br.lines()
-                    .filter(line -> line.startsWith("Hardware") || line.startsWith("processor") || line.startsWith("model name"))
-                    .map(line -> line.split(":\\s+", 2)[1])
+            // Attempt to find processor name from "Hardware", "model name", or "Processor" fields
+                String processorName = br.lines()
+                    .map(String::trim)
+                    .filter(line -> line.startsWith("Hardware") || line.startsWith("model name") || line.startsWith("Processor"))
+                    .map(line -> {
+                        String[] parts = line.split(":\\s+", 2);
+                        if (parts.length == 2) {
+                            return parts[1].trim();
+                        }
+                        return null;
+                    })
+                    .filter(Objects::nonNull)
                     .findFirst()
                     .orElse("Unknown CPU or SoC");
+
+            return processorName;
         } catch (IOException e) {
             return "Unknown CPU or SoC";
         }

@@ -1,10 +1,12 @@
 package net.vulkanmod.vulkan;
 
 import oshi.hardware.CentralProcessor;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Objects;
 
 public class SystemInfo {
     public static final String cpuInfo;

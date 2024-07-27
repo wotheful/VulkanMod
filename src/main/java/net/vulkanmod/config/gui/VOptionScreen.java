@@ -231,6 +231,7 @@ public class VOptionScreen extends Screen {
             this.renderTransparentBackground(guiGraphics);
         } else {
             this.renderDirtBackground(guiGraphics);
+            RenderSystem.enableBlend();
             GuiRenderer.fillGradient(0, 0, this.width, this.height,
                     ColorUtil.ARGB.pack(0.0f, 0.0f, 0.0f, 0.2f), ColorUtil.ARGB.pack(0.0f, 0.0f, 0.0f, 0.3f));
         }
@@ -242,9 +243,9 @@ public class VOptionScreen extends Screen {
         GuiRenderer.guiGraphics = guiGraphics;
         GuiRenderer.setPoseStack(guiGraphics.pose());
 
-        RenderSystem.enableBlend();
+        this.renderBackground(guiGraphics, 0, 0, delta);
 
-        this.renderBackground(guiGraphics, 0, 0, 0);
+        RenderSystem.enableBlend();
 
         int size = minecraft.font.lineHeight * 4;
 

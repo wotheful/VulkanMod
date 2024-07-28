@@ -44,34 +44,11 @@ public abstract class ImageUtil {
 
             LongBuffer pStagingBuffer = stack.mallocLong(1);
             PointerBuffer pStagingAllocation = stack.pointers(0L);
-
-            // Iterate through different memory property combinations
-            int[] memoryProperties = {
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                VK_MEMORY_PROPERTY_HOST_CACHED_BIT
-            };
-
-            for (int properties : memoryProperties) {
-                try {
-                    MemoryManager.getInstance().createBuffer(imageSize,
-                        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                        properties,
-                        pStagingBuffer,
-                        pStagingAllocation);
-                    break;
-                } catch (Exception e) {
-                    continue;
-                }
-            }
-
-            if (pStagingBuffer.get(0) == VK_NULL_HANDLE || pStagingAllocation.get(0) == VK_NULL_HANDLE) {
-                throw new RuntimeException("Failed to allocate staging buffer with suitable properties.");
-            }
+            MemoryManager.getInstance().createBuffer(imageSize,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
+                    pStagingBuffer,
+                    pStagingAllocation);
 
             copyImageToBuffer(commandBuffer.getHandle(), pStagingBuffer.get(0), image.getId(), 0, image.width, image.height, 0, 0, 0, 0, 0);
             image.transitionImageLayout(stack, commandBuffer.getHandle(), prevLayout);

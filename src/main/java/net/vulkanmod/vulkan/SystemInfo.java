@@ -2,49 +2,36 @@ package net.vulkanmod.vulkan;
 
 import oshi.hardware.CentralProcessor;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.util.Objects;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.stream.Stream;
 
 public class SystemInfo {
     public static final String cpuInfo;
 
     static {
-        cpuInfo = isRunningOnAndroid() ? getProcessorNameForAndroid() + (!getProcessorNameForAndroid().equals("Unknown CPU or SoC") && isCPUInfoAvailable() ? " (SoC)" : "") : getProcessorNameForDesktop();
+        cpuInfo = isRunningOnAndroid() ? getProcessorNameForAndroid() : getProcessorNameForDesktop();
     }
 
     public static String getProcessorNameForAndroid() {
-        try (BufferedReader br = new BufferedReader(new FileReader("/proc/cpuinfo"))) {
-            // Attempt to find processor name from "Hardware", "model name", or "Processor" fields
-                String processorName = br.lines()
-                    .map(String::trim)
-                    .filter(line -> line.startsWith("Hardware") || line.startsWith("model name") || line.startsWith("Processor"))
-                    .map(line -> {
-                        String[] parts = line.split(":\\s+", 2);
-                        if (parts.length == 2) {
-                            return parts[1].trim();
-                        }
-                        return null;
-                    })
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElse("Unknown CPU or SoC");
-
-            return processorName;
+        try (Stream<String> lines = Files.lines(Paths.get("/proc/cpuinfo"))) {
+            return lines.filter(line -> line.startsWith("Hardware") || line.startsWith("model name"))
+                .reduce((f, s) -> f.startsWith("H") ? f : s)
+                .map(line -> {
+                    String value = line.split(":")[1].trim();
+                    return line.startsWith("H") ? value.split("/")[0] + " (SoC)" : value;
+                }).orElse("Unknown SoC");
         } catch (IOException e) {
-            return "Unknown CPU or SoC";
+            return "Unknown SoC";
         }
     }
 
     public static String getProcessorNameForDesktop() {
         try {
-            oshi.SystemInfo systemInfo = new oshi.SystemInfo();
-            CentralProcessor centralProcessor = systemInfo.getHardware().getProcessor();
-            return String.format("%s", centralProcessor.getProcessorIdentifier().getName()).replaceAll("\\s+", " ");
+            return new oshi.SystemInfo().getHardware().getProcessor().getProcessorIdentifier().getName().replaceAll("\\s+", " ");
         } catch (Exception e) {
-            return getProcessorNameForAndroid();
+            return "Unknown CPU";
         }
     }
 
@@ -55,10 +42,5 @@ public class SystemInfo {
                 System.getenv("SCL_ENVIRON") != null ||
                 System.getenv("SCL_RENDERER") != null ||
                 System.getenv("POJAV_RENDERER") != null);
-    }
-
-    private static boolean isCPUInfoAvailable() {
-        File cpuInfoFile = new File("/proc/cpuinfo");
-        return cpuInfoFile.exists() && cpuInfoFile.canRead();
     }
 }

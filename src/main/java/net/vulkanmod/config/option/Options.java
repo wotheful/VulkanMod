@@ -11,9 +11,14 @@ import net.vulkanmod.config.video.VideoModeSet;
 import net.vulkanmod.render.chunk.build.light.LightMode;
 import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
+import net.vulkanmod.vulkan.Vulkan;
 import net.vulkanmod.vulkan.device.DeviceManager;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VkSurfaceCapabilitiesKHR;
 
 import java.util.stream.IntStream;
+
+import static org.lwjgl.vulkan.KHRSurface.vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
 
 public abstract class Options {
     public static boolean fullscreenDirty = false;
@@ -21,6 +26,18 @@ public abstract class Options {
     static Minecraft minecraft = Minecraft.getInstance();
     static Window window = minecraft.getWindow();
     static net.minecraft.client.Options minecraftOptions = minecraft.options;
+
+    private static final int minImageCount;
+    private static final int maxImageCount;
+
+    static {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            final VkSurfaceCapabilitiesKHR capabilities = VkSurfaceCapabilitiesKHR.malloc(stack);
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(DeviceManager.physicalDevice, Vulkan.getSurface(), capabilities);
+            minImageCount = capabilities.minImageCount();
+            maxImageCount = Math.min(capabilities.maxImageCount(), 32);
+        }
+    }
 
     public static OptionBlock[] getVideoOpts() {
         var videoMode = config.videoMode;
@@ -258,6 +275,7 @@ public abstract class Options {
                                 },
                                 () -> config.uniqueOpaqueLayer)
                                 .setTooltip(Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
+
                         new SwitchOption(Component.translatable("vulkanmod.options.backfaceCulling"),
                                 value -> {
                                     config.backFaceCulling = value;
@@ -284,6 +302,13 @@ public abstract class Options {
                                     Renderer.scheduleSwapChainUpdate();
                                 }, () -> config.frameQueueSize)
                                 .setTooltip(Component.translatable("vulkanmod.options.frameQueue.tooltip")),
+                        new RangeOption(Component.translatable("vulkanmod.options.swapchainImages"), minImageCount,
+                                maxImageCount, 1,
+                                value -> {
+                                    config.imageCount = value;
+                                    Renderer.scheduleSwapChainUpdate();
+                                }, () -> config.imageCount)
+                                .setTooltip(Component.translatable("vulkanmod.options.swapchainImages.tooltip")),
                         new CyclingOption<>(Component.translatable("vulkanmod.options.deviceSelector"),
                                 IntStream.range(-1, DeviceManager.suitableDevices.size()).boxed().toArray(Integer[]::new),
                                 value -> config.device = value,

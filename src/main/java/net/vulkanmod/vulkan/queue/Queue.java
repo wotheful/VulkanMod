@@ -130,32 +130,6 @@ public abstract class Queue {
                 Initializer.LOGGER.warn("Using compute queue as present fallback");
             }
 
-            if (indices.transferFamily == -1) {
-
-                int fallback = -1;
-                for (int i = 0; i < queueFamilies.capacity(); i++) {
-                    int queueFlags = queueFamilies.get(i).queueFlags();
-
-                    if ((queueFlags & VK_QUEUE_TRANSFER_BIT) != 0) {
-                        if (fallback == -1)
-                            fallback = i;
-
-                        if ((queueFlags & (VK_QUEUE_GRAPHICS_BIT)) == 0) {
-                            indices.transferFamily = i;
-
-                            if (i != indices.computeFamily)
-                                break;
-                            fallback = i;
-                        }
-                    }
-
-                    if (fallback == -1)
-                        throw new RuntimeException("Failed to find queue family with transfer support");
-
-                    indices.transferFamily = fallback;
-                }
-            }
-
             if (indices.computeFamily == -1) {
                 for (int i = 0; i < queueFamilies.capacity(); i++) {
                     int queueFlags = queueFamilies.get(i).queueFlags();
@@ -167,6 +141,20 @@ public abstract class Queue {
                 }
             }
 
+            if (indices.transferFamily == -1) {
+                if (indices.computeFamily != -1) {
+                    indices.transferFamily = indices.computeFamily;
+                } else {
+                    indices.transferFamily = indices.graphicsFamily;
+                }
+            }
+
+            if (indices.computeFamily == -1) {
+                indices.computeFamily = indices.graphicsFamily;
+            }
+
+            if (indices.transferFamily == VK_QUEUE_FAMILY_IGNORED)
+                throw new RuntimeException("Unable to find queue family with transfer support.");
             if (indices.graphicsFamily == VK_QUEUE_FAMILY_IGNORED)
                 throw new RuntimeException("Unable to find queue family with graphics support.");
             if (indices.presentFamily == VK_QUEUE_FAMILY_IGNORED)

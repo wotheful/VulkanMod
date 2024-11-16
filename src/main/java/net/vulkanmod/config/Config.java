@@ -23,6 +23,8 @@ public class Config {
 
     public boolean uniqueOpaqueLayer = true;
     public boolean entityCulling = true;
+    public boolean animations = true;
+    public int imageCount = 3;
     public int device = -1;
 
     public int ambientOcclusion = 1;

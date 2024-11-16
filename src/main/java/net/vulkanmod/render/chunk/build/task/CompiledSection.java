@@ -2,7 +2,7 @@ package net.vulkanmod.render.chunk.build.task;
 
 import com.google.common.collect.Lists;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.vulkanmod.render.vertex.TerrainBufferBuilder;
+import net.vulkanmod.render.vertex.QuadSorter;
 
 import org.jetbrains.annotations.Nullable;
 import java.util.List;
@@ -12,7 +12,7 @@ public class CompiledSection {
 
     boolean isCompletelyEmpty = false;
     final List<BlockEntity> blockEntities = Lists.newArrayList();
-    @Nullable TerrainBufferBuilder.SortState transparencyState;
+    @Nullable QuadSorter.SortState transparencyState;
 
     public boolean hasTransparencyState() {
         return this.transparencyState != null;

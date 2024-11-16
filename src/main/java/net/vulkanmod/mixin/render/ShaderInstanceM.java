@@ -1,5 +1,6 @@
 package net.vulkanmod.mixin.render;
 
+import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.shaders.Program;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -11,10 +12,11 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceProvider;
 import net.vulkanmod.Initializer;
 import net.vulkanmod.interfaces.ShaderMixed;
+import net.vulkanmod.render.shader.ShaderLoadUtil;
 import net.vulkanmod.vulkan.shader.GraphicsPipeline;
 import net.vulkanmod.vulkan.shader.Pipeline;
-import net.vulkanmod.vulkan.shader.layout.Uniform;
 import net.vulkanmod.vulkan.shader.descriptor.UBO;
+import net.vulkanmod.vulkan.shader.layout.Uniform;
 import net.vulkanmod.vulkan.shader.parser.GlslConverter;
 import net.vulkanmod.vulkan.util.MappedBuffer;
 import org.apache.commons.io.IOUtils;
@@ -46,7 +48,6 @@ public class ShaderInstanceM implements ShaderMixed {
     @Shadow @Final @Nullable public com.mojang.blaze3d.shaders.Uniform PROJECTION_MATRIX;
     @Shadow @Final @Nullable public com.mojang.blaze3d.shaders.Uniform COLOR_MODULATOR;
     @Shadow @Final @Nullable public com.mojang.blaze3d.shaders.Uniform LINE_WIDTH;
-
     @Shadow @Final @Nullable public com.mojang.blaze3d.shaders.Uniform GLINT_ALPHA;
     @Shadow @Final @Nullable public com.mojang.blaze3d.shaders.Uniform FOG_START;
     @Shadow @Final @Nullable public com.mojang.blaze3d.shaders.Uniform FOG_END;
@@ -60,8 +61,7 @@ public class ShaderInstanceM implements ShaderMixed {
     private String fsName;
 
     private GraphicsPipeline pipeline;
-    boolean isLegacy = false;
-
+    boolean doUniformUpdate = false;
 
     public GraphicsPipeline getPipeline() {
         return pipeline;
@@ -69,35 +69,38 @@ public class ShaderInstanceM implements ShaderMixed {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void create(ResourceProvider resourceProvider, String name, VertexFormat format, CallbackInfo ci) {
+        String configName = name;
+        JsonObject config = ShaderLoadUtil.getJsonConfig("core", configName);
 
-        try {
-            if (Pipeline.class.getResourceAsStream(String.format("/assets/vulkanmod/shaders/minecraft/core/%s/%s.json", name, name)) == null) {
-                createLegacyShader(resourceProvider, format);
-                return;
-            }
-
-            String path = String.format("minecraft/core/%s/%s", name, name);
-            Pipeline.Builder pipelineBuilder = new Pipeline.Builder(format, path);
-            pipelineBuilder.parseBindingsJSON();
-            pipelineBuilder.compileShaders();
-            this.pipeline = pipelineBuilder.createGraphicsPipeline();
-        } catch (Exception e) {
-            System.out.printf("Error on shader %s creation\n", name);
-            e.printStackTrace();
-            throw e;
+        if (config == null) {
+            createLegacyShader(resourceProvider, format);
+            return;
         }
+
+        Pipeline.Builder builder = new Pipeline.Builder(format, configName);
+        builder.setUniformSupplierGetter(info -> this.getUniformSupplier(info.name));
+
+        builder.parseBindings(config);
+
+        ShaderLoadUtil.loadShaders(builder, config, configName, "core");
+
+        GraphicsPipeline pipeline = builder.createGraphicsPipeline();
+        this.pipeline = pipeline;
     }
 
     @Redirect(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/ShaderInstance;getOrCreate(Lnet/minecraft/server/packs/resources/ResourceProvider;Lcom/mojang/blaze3d/shaders/Program$Type;Ljava/lang/String;)Lcom/mojang/blaze3d/shaders/Program;"))
     private Program loadNames(ResourceProvider resourceProvider, Program.Type type, String name) {
+        String path;
         if (this.name.contains(String.valueOf(ResourceLocation.NAMESPACE_SEPARATOR))) {
             ResourceLocation location = ResourceLocation.tryParse(name);
-            String path = location.withPath("shaders/core/%s".formatted(location.getPath())).toString();
+            path = location.withPath("shaders/core/%s".formatted(location.getPath())).toString();
+        } else {
+            path = "shaders/core/%s".formatted(name);
+        }
 
-            switch (type) {
-                case VERTEX -> this.vsPath = path;
-                case FRAGMENT -> this.fsName = path;
-            }
+        switch (type) {
+            case VERTEX -> this.vsPath = path;
+            case FRAGMENT -> this.fsName = path;
         }
 
         return null;
@@ -120,7 +123,7 @@ public class ShaderInstanceM implements ShaderMixed {
      */
     @Overwrite
     public void apply() {
-        if (!this.isLegacy)
+        if (!this.doUniformUpdate)
             return;
 
         if (this.MODEL_VIEW_MATRIX != null) {
@@ -165,7 +168,7 @@ public class ShaderInstanceM implements ShaderMixed {
 
         if (this.SCREEN_SIZE != null) {
             Window window = Minecraft.getInstance().getWindow();
-            this.SCREEN_SIZE.set((float)window.getWidth(), (float)window.getHeight());
+            this.SCREEN_SIZE.set((float) window.getWidth(), (float) window.getHeight());
         }
 
         if (this.LINE_WIDTH != null) {
@@ -179,12 +182,11 @@ public class ShaderInstanceM implements ShaderMixed {
     @Overwrite
     public void clear() {}
 
-    private void setUniformSuppliers(UBO ubo) {
-
-        for(Uniform vUniform : ubo.getUniforms()) {
+    public void setupUniformSuppliers(UBO ubo) {
+        for (Uniform vUniform : ubo.getUniforms()) {
             com.mojang.blaze3d.shaders.Uniform uniform = this.uniformMap.get(vUniform.getName());
 
-            if(uniform == null) {
+            if (uniform == null) {
                 Initializer.LOGGER.error(String.format("Error: field %s not present in uniform map", vUniform.getName()));
                 continue;
             }
@@ -209,6 +211,41 @@ public class ShaderInstanceM implements ShaderMixed {
 
     }
 
+    public Supplier<MappedBuffer> getUniformSupplier(String name) {
+        com.mojang.blaze3d.shaders.Uniform uniform1 = this.uniformMap.get(name);
+
+        if (uniform1 == null) {
+            Initializer.LOGGER.error(String.format("Error: field %s not present in uniform map", name));
+            return null;
+        }
+
+        Supplier<MappedBuffer> supplier;
+        ByteBuffer byteBuffer;
+
+        if (uniform1.getType() <= 3) {
+            byteBuffer = MemoryUtil.memByteBuffer(uniform1.getIntBuffer());
+        } else if (uniform1.getType() <= 10) {
+            byteBuffer = MemoryUtil.memByteBuffer(uniform1.getFloatBuffer());
+        } else {
+            throw new RuntimeException("out of bounds value for uniform " + uniform1);
+        }
+
+        MappedBuffer mappedBuffer = MappedBuffer.createFromBuffer(byteBuffer);
+        supplier = () -> mappedBuffer;
+
+        return supplier;
+    }
+
+    @Override
+    public void setDoUniformsUpdate() {
+        this.doUniformUpdate = true;
+    }
+
+    @Override
+    public void setPipeline(GraphicsPipeline graphicsPipeline) {
+        this.pipeline = graphicsPipeline;
+    }
+
     private void createLegacyShader(ResourceProvider resourceProvider, VertexFormat format) {
         try {
             String vertPath = this.vsPath + ".vsh";
@@ -225,15 +262,14 @@ public class ShaderInstanceM implements ShaderMixed {
             Pipeline.Builder builder = new Pipeline.Builder(format, this.name);
 
             converter.process(vshSrc, fshSrc);
-            UBO ubo = converter.getUBO();
-            this.setUniformSuppliers(ubo);
+            UBO ubo = converter.createUBO();
+            this.setupUniformSuppliers(ubo);
 
             builder.setUniforms(Collections.singletonList(ubo), converter.getSamplerList());
             builder.compileShaders(this.name, converter.getVshConverted(), converter.getFshConverted());
 
             this.pipeline = builder.createGraphicsPipeline();
-            this.isLegacy = true;
-
+            this.doUniformUpdate = true;
         } catch (Exception e) {
             Initializer.LOGGER.error("Error on shader {} conversion/compilation", this.name);
             e.printStackTrace();

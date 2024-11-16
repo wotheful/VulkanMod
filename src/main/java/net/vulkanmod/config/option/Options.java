@@ -9,6 +9,7 @@ import net.vulkanmod.config.gui.OptionBlock;
 import net.vulkanmod.config.video.VideoModeManager;
 import net.vulkanmod.config.video.VideoModeSet;
 import net.vulkanmod.render.chunk.build.light.LightMode;
+import net.vulkanmod.render.vertex.TerrainRenderType;
 import net.vulkanmod.vulkan.Renderer;
 import net.vulkanmod.vulkan.Vulkan;
 import net.vulkanmod.vulkan.device.DeviceManager;
@@ -269,16 +270,19 @@ public abstract class Options {
                         new SwitchOption(Component.translatable("vulkanmod.options.uniqueOpaqueLayer"),
                                 value -> {
                                     config.uniqueOpaqueLayer = value;
+                                    TerrainRenderType.updateMapping();
                                     minecraft.levelRenderer.allChanged();
                                 },
                                 () -> config.uniqueOpaqueLayer)
                                 .setTooltip(Component.translatable("vulkanmod.options.uniqueOpaqueLayer.tooltip")),
-                        new SwitchOption(Component.translatable("vulkanmod.options.animations"),
+
+                        new SwitchOption(Component.translatable("vulkanmod.options.backfaceCulling"),
                                 value -> {
-                                    config.animations = value;
+                                    config.backFaceCulling = value;
+                                    Minecraft.getInstance().levelRenderer.allChanged();
                                 },
-                                () -> config.animations)
-                                .setTooltip(Component.translatable("vulkanmod.options.animations.tooltip")),
+                                () -> config.backFaceCulling)
+                                .setTooltip(Component.translatable("vulkanmod.options.backfaceCulling.tooltip")),
                         new SwitchOption(Component.translatable("vulkanmod.options.indirectDraw"),
                                 value -> config.indirectDraw = value,
                                 () -> config.indirectDraw)

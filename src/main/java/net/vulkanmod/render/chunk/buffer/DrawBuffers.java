@@ -369,7 +369,10 @@ public class DrawBuffers {
     public void bindBuffers(VkCommandBuffer commandBuffer, Pipeline pipeline, TerrainRenderType terrainRenderType, double camX, double camY, double camZ) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             var vertexBuffer = getAreaBuffer(terrainRenderType);
-            nvkCmdBindVertexBuffers(commandBuffer, 0, 1, stack.npointer(vertexBuffer.getId()), stack.npointer(0));
+            // VkBuffer is either a 64-bit unsigned integer or a 64-bit pointer, and
+            // VkDeviceSize is always an uint64_t. Both are equivalent to a Java "long",
+            // so use "stack.nlong" here.
+            nvkCmdBindVertexBuffers(commandBuffer, 0, 1, stack.nlong(vertexBuffer.getId()), stack.nlong(0));
             updateChunkAreaOrigin(commandBuffer, pipeline, camX, camY, camZ, stack);
         }
 

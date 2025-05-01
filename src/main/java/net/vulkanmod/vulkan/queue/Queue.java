@@ -86,6 +86,14 @@ public abstract class Queue {
         return queueFamilyIndices;
     }
 
+    private static int findFirstQueueIndex(VkQueueFamilyProperties.Buffer queueFamilies, int flags) {
+        for (int i = 0; i < queueFamilies.capacity(); i++) {
+            int queueFlags = queueFamilies.get(i).queueFlags();
+            if((queueFlags & flags) != 0) return i;
+        }
+        return -1;
+    }
+
     public static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
         QueueFamilyIndices indices = new QueueFamilyIndices();
 
@@ -143,7 +151,6 @@ public abstract class Queue {
             // In case there's no dedicated transfer queue, we need choose another one
             // preferably a different one from the already selected queues
             if (indices.transferFamily == -1) {
-
                 int transferIndex = -1;
                 for (int i = 0; i < queueFamilies.capacity(); i++) {
                     int queueFlags = queueFamilies.get(i).queueFlags();
@@ -170,14 +177,7 @@ public abstract class Queue {
             }
 
             if (indices.computeFamily == -1) {
-                for (int i = 0; i < queueFamilies.capacity(); i++) {
-                    int queueFlags = queueFamilies.get(i).queueFlags();
-
-                    if ((queueFlags & VK_QUEUE_COMPUTE_BIT) != 0) {
-                        indices.computeFamily = i;
-                        break;
-                    }
-                }
+                indices.computeFamily = findFirstQueueIndex(queueFamilies, VK_QUEUE_COMPUTE_BIT);
             }
 
             if (indices.graphicsFamily == VK_QUEUE_FAMILY_IGNORED)

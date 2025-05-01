@@ -207,6 +207,7 @@ public class VOptionList extends GuiElement {
         GuiRenderer.enableScissor(x, y, width, height);
 
         this.renderList(mouseX, mouseY);
+        GuiRenderer.flush();
         GuiRenderer.disableScissor();
 
         // Scroll bar
@@ -272,6 +273,8 @@ public class VOptionList extends GuiElement {
 
             rowTop += entry.getTotalHeight();
         }
+
+        GuiRenderer.flush();
     }
 
     private Entry getEntry(int j) {

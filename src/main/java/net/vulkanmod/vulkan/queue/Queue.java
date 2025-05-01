@@ -148,19 +148,32 @@ public abstract class Queue {
                 Initializer.LOGGER.warn("Using compute queue as present fallback");
             }
 
+            // In case there's no dedicated transfer queue, we need choose another one
+            // preferably a different one from the already selected queues
             if (indices.transferFamily == -1) {
-                // Some driversmay not have a transfer-only queue (for example iGPUs, when there's usually no need for DMA)
-                int fallback = findFirstQueueIndex(queueFamilies, VK_QUEUE_TRANSFER_BIT);
-                if(fallback == -1) {
-                    // the Adreno driver takes this further: it straight up has no queues with the transfer bit.
-                    // Rely on a compute or graphics queue in this case.
-                    Initializer.LOGGER.warn("No transfer queues found, will try compute-graphics queue");
-                    fallback = findFirstQueueIndex(queueFamilies, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+                int transferIndex = -1;
+                for (int i = 0; i < queueFamilies.capacity(); i++) {
+                    int queueFlags = queueFamilies.get(i).queueFlags();
+
+                    if ((queueFlags & VK_QUEUE_TRANSFER_BIT) != 0) {
+                        if (transferIndex == -1)
+                            transferIndex = i;
+
+                        if ((queueFlags & (VK_QUEUE_GRAPHICS_BIT)) == 0) {
+                            indices.transferFamily = i;
+
+                            if (i != indices.computeFamily)
+                                break;
+
+                            transferIndex = i;
+                        }
+                    }
                 }
-                if(fallback == -1)
-                    throw new RuntimeException("Failed to a suitable transfer queue fallback");
-                else
-                    indices.transferFamily = fallback;
+
+                if (transferIndex == -1)
+                    throw new RuntimeException("Failed to find queue family with transfer support");
+
+                indices.transferFamily = transferIndex;
             }
 
             if (indices.computeFamily == -1) {
